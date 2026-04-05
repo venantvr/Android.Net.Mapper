@@ -12,6 +12,7 @@
 
 - [FR - Français](#fr---français)
 - [EN - English](#en---english)
+- [Documentation technique / Technical Documentation](docs/PROTOCOLS.md)
 
 ---
 
