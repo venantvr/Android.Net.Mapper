@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="background">#080F18</color>
+    <color name="surface">#0D1B2A</color>
+    <color name="input_bg">#1A2A3A</color>
+    <color name="input_stroke">#2A3A4A</color>
+    <color name="primary">#0A84FF</color>
+    <color name="success">#4CAF50</color>
+    <color name="text_primary">#FFFFFF</color>
+    <color name="text_secondary">#AAAAAA</color>
+    <color name="text_hint">#666666</color>
+    <color name="log_text">#4CAF50</color>
+    <color name="card_stroke_saved">#4CAF50</color>
+    <color name="card_stroke_default">#1E2E3E</color>
+    <color name="vendor_text">#7CB8FF</color>
+    <color name="internet_node">#F5A623</color>
+</resources>
