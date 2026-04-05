@@ -2,6 +2,10 @@
 
 > Scanner réseau Android inspiré de nmap | Android network scanner inspired by nmap
 
+[![Android](https://img.shields.io/badge/Android-8.0+-green.svg)](https://developer.android.com)
+[![Java](https://img.shields.io/badge/Java-17-orange.svg)](https://openjdk.org/)
+[![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
 ---
 
 ## Table des matières / Table of Contents
@@ -23,12 +27,20 @@ NetMapper est une application Android native de scan réseau qui permet de déco
 - **3 profils de scan** :
   - Ping : ICMP/ARP uniquement (rapide)
   - Quick : 6 ports courants (22, 80, 443, 8080, 3389, 445)
-  - Full : 18 ports (scan complet)
+  - Full : 23 ports (scan complet)
 - **Détection Wi-Fi** : Récupération automatique du SSID, BSSID, IP locale et gateway
 - **Base OUI** : 60+ fabricants reconnus (Apple, Samsung, Raspberry Pi, etc.)
 - **Carte topologique** : Visualisation textuelle de la topologie réseau
-- **Enrichissement ARP** : Récupération des adresses MAC via /proc/net/arp
-- **Support nmap natif** : Possibilité d'utiliser un binaire nmap ARM64
+- **Enrichissement ARP** : Récupération des adresses MAC
+- **Banner grabbing** : Récupération des bannières HTTP, SSH, FTP, SMTP
+- **OS fingerprinting** : Détection du système d'exploitation
+- **Certificats SSL** : Affichage des infos SSL/TLS
+- **Mesure de latence** : RTT en millisecondes
+- **Wake-on-LAN** : Réveil d'appareils via magic packet
+- **Traceroute** : Affichage du chemin réseau
+- **Ping** : Test de connectivité avec statistiques
+- **Export** : JSON et CSV
+- **Historique** : Base SQLite des scans
 
 ### Architecture
 
@@ -37,11 +49,16 @@ graph TD
     A[MainActivity] --> B[Scanner]
     A --> C[DeviceAdapter]
     A --> D[OUI Database]
-    B --> E[ThreadPool 64]
-    E --> F[Socket Probe]
-    E --> G[ICMP/ARP Check]
-    B --> H[ARP Enrichment]
-    H --> I[/proc/net/arp]
+    A --> E[ScanDbHelper]
+    A --> F[NetTools]
+    B --> G[ThreadPool 64]
+    G --> H[Socket Probe]
+    G --> I[Banner Grab]
+    G --> J[SSL Check]
+    B --> K[ARP Enrichment]
+    F --> L[Wake-on-LAN]
+    F --> M[Traceroute]
+    F --> N[Ping]
 ```
 
 ### Interface
@@ -59,7 +76,18 @@ graph LR
 | Scan      | Configuration et lancement du scan   |
 | Appareils | Liste filtrable des hôtes découverts |
 | Carte     | Topologie réseau visuelle            |
-| Config    | Lookup MAC, statistiques, docs nmap  |
+| Config    | Outils réseau, export, statistiques  |
+
+### Outils réseau
+
+| Outil       | Description                        |
+| ----------- | ---------------------------------- |
+| MAC Lookup  | Recherche fabricant par OUI        |
+| Ping        | Test connectivité (4 paquets)      |
+| Traceroute  | Chemin réseau (max 15 hops)        |
+| Wake-on-LAN | Réveil via magic packet UDP:9      |
+| Export JSON | Export complet au format JSON      |
+| Export CSV  | Export tableur au format CSV       |
 
 ### Permissions requises
 
@@ -73,7 +101,7 @@ graph LR
 
 ### Installation
 
-1. Télécharger l'APK signé
+1. Télécharger `NetMapper-v1.1-signed.apk`
 2. Activer "Sources inconnues" dans les paramètres
 3. Installer l'application
 
@@ -81,7 +109,7 @@ graph LR
 
 ```bash
 # Cloner le projet
-git clone <repository>
+git clone https://github.com/venantvr/Android.Net.Mapper.git
 cd Android.Net.Mapper
 
 # Compiler en debug
@@ -92,20 +120,6 @@ cd Android.Net.Mapper
 
 # Signer l'APK
 apksigner sign --ks release-key.jks --out app-signed.apk app-release-unsigned.apk
-```
-
-### Structure du projet
-
-```mermaid
-graph TD
-    A[Android.Net.Mapper] --> B[app/src/main]
-    B --> C[java/com/netmapper]
-    C --> D[MainActivity.java]
-    B --> E[res]
-    E --> F[layout]
-    E --> G[drawable]
-    E --> H[values]
-    E --> I[menu]
 ```
 
 ---
@@ -122,12 +136,20 @@ NetMapper is a native Android network scanner app that discovers devices connect
 - **3 scan profiles**:
   - Ping: ICMP/ARP only (fast)
   - Quick: 6 common ports (22, 80, 443, 8080, 3389, 445)
-  - Full: 18 ports (complete scan)
+  - Full: 23 ports (complete scan)
 - **Wi-Fi detection**: Automatic SSID, BSSID, local IP and gateway retrieval
 - **OUI database**: 60+ recognized manufacturers (Apple, Samsung, Raspberry Pi, etc.)
 - **Topology map**: Text-based network topology visualization
-- **ARP enrichment**: MAC address retrieval via /proc/net/arp
-- **Native nmap support**: Optional ARM64 nmap binary support
+- **ARP enrichment**: MAC address retrieval
+- **Banner grabbing**: HTTP, SSH, FTP, SMTP banner capture
+- **OS fingerprinting**: Operating system detection
+- **SSL certificates**: SSL/TLS certificate info
+- **Latency measurement**: RTT in milliseconds
+- **Wake-on-LAN**: Device wake via magic packet
+- **Traceroute**: Network path display
+- **Ping**: Connectivity test with statistics
+- **Export**: JSON and CSV
+- **History**: SQLite scan database
 
 ### Architecture
 
@@ -136,11 +158,16 @@ graph TD
     A[MainActivity] --> B[Scanner]
     A --> C[DeviceAdapter]
     A --> D[OUI Database]
-    B --> E[ThreadPool 64]
-    E --> F[Socket Probe]
-    E --> G[ICMP/ARP Check]
-    B --> H[ARP Enrichment]
-    H --> I[/proc/net/arp]
+    A --> E[ScanDbHelper]
+    A --> F[NetTools]
+    B --> G[ThreadPool 64]
+    G --> H[Socket Probe]
+    G --> I[Banner Grab]
+    G --> J[SSL Check]
+    B --> K[ARP Enrichment]
+    F --> L[Wake-on-LAN]
+    F --> M[Traceroute]
+    F --> N[Ping]
 ```
 
 ### Interface
@@ -158,7 +185,18 @@ graph LR
 | Scan    | Scan configuration and launch       |
 | Devices | Filterable list of discovered hosts |
 | Map     | Visual network topology             |
-| Config  | MAC lookup, stats, nmap docs        |
+| Config  | Network tools, export, statistics   |
+
+### Network Tools
+
+| Tool        | Description                     |
+| ----------- | ------------------------------- |
+| MAC Lookup  | Vendor lookup by OUI            |
+| Ping        | Connectivity test (4 packets)   |
+| Traceroute  | Network path (max 15 hops)      |
+| Wake-on-LAN | Wake via magic packet UDP:9     |
+| Export JSON | Full export in JSON format      |
+| Export CSV  | Spreadsheet export in CSV       |
 
 ### Required Permissions
 
@@ -172,7 +210,7 @@ graph LR
 
 ### Installation
 
-1. Download the signed APK
+1. Download `NetMapper-v1.1-signed.apk`
 2. Enable "Unknown sources" in settings
 3. Install the application
 
@@ -180,7 +218,7 @@ graph LR
 
 ```bash
 # Clone the project
-git clone <repository>
+git clone https://github.com/venantvr/Android.Net.Mapper.git
 cd Android.Net.Mapper
 
 # Debug build
@@ -191,20 +229,6 @@ cd Android.Net.Mapper
 
 # Sign APK
 apksigner sign --ks release-key.jks --out app-signed.apk app-release-unsigned.apk
-```
-
-### Project Structure
-
-```mermaid
-graph TD
-    A[Android.Net.Mapper] --> B[app/src/main]
-    B --> C[java/com/netmapper]
-    C --> D[MainActivity.java]
-    B --> E[res]
-    E --> F[layout]
-    E --> G[drawable]
-    E --> H[values]
-    E --> I[menu]
 ```
 
 ---
@@ -220,19 +244,41 @@ sequenceDiagram
     participant T as ThreadPool
     participant H as Host
 
-    U->>S: startScan(subnet, profile)
+    U->>S: startScan subnet, profile
     S->>T: create 64 threads
-    loop For each IP (1-254)
-        T->>H: Socket.connect(ip, port, 500ms)
+    loop For each IP 1-254
+        T->>H: Socket.connect ip, port, 500ms
         alt Port open
             H-->>T: Connection success
-            T->>S: onHost(device)
+            T->>T: grabBanner
+            T->>S: onHost device
         else Port closed
             H-->>T: Connection failed
         end
     end
-    S->>S: enrichWithArp()
-    S->>U: onDone(devices)
+    S->>S: enrichWithArp
+    S->>S: saveScanToDb
+    S->>U: onDone devices
+```
+
+### Device Model
+
+```mermaid
+classDiagram
+    class Device {
+        +String ip
+        +String mac
+        +String vendor
+        +String hostname
+        +String osGuess
+        +List~Integer~ openPorts
+        +Map~Integer,String~ banners
+        +Map~Integer,String~ services
+        +String sslCertInfo
+        +long latencyMs
+        +boolean saved
+        +long firstSeen
+    }
 ```
 
 ### OUI Lookup
@@ -240,11 +286,21 @@ sequenceDiagram
 ```mermaid
 graph LR
     A[MAC Address] --> B[Extract prefix]
-    B --> C[8 chars: XX:XX:XX]
+    B --> C["8 chars: XX:XX:XX"]
     C --> D{OUI Map}
     D -->|Found| E[Vendor Name]
     D -->|Not Found| F[Unknown Vendor]
 ```
+
+---
+
+## Screenshots
+
+Dark Material3 theme with:
+- Background: `#080F18`
+- Surface: `#0D1B2A`
+- Primary: `#0A84FF`
+- Success: `#4CAF50`
 
 ---
 

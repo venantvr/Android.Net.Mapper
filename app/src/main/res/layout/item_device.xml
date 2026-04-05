@@ -5,11 +5,14 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:layout_marginBottom="8dp"
+    android:clickable="true"
+    android:focusable="true"
     app:cardBackgroundColor="#0D1B2A"
     app:cardCornerRadius="8dp"
     app:cardElevation="0dp"
     app:strokeColor="#1E2E3E"
-    app:strokeWidth="1dp">
+    app:strokeWidth="1dp"
+    app:rippleColor="#1A0A84FF">
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -23,15 +26,32 @@
             android:layout_weight="1"
             android:orientation="vertical">
 
-            <TextView
-                android:id="@+id/tvIp"
-                android:layout_width="wrap_content"
+            <LinearLayout
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:fontFamily="monospace"
-                android:text="192.168.1.1"
-                android:textColor="#0A84FF"
-                android:textSize="16sp"
-                android:textStyle="bold" />
+                android:orientation="horizontal">
+
+                <TextView
+                    android:id="@+id/tvIp"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="monospace"
+                    android:text="192.168.1.1"
+                    android:textColor="#0A84FF"
+                    android:textSize="16sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/tvLatency"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="8dp"
+                    android:text="⏱ 5ms"
+                    android:textColor="#4CAF50"
+                    android:textSize="11sp"
+                    android:visibility="gone" />
+
+            </LinearLayout>
 
             <TextView
                 android:id="@+id/tvMac"
@@ -60,6 +80,16 @@
                 android:text=""
                 android:textColor="#666666"
                 android:textSize="12sp"
+                android:visibility="gone" />
+
+            <TextView
+                android:id="@+id/tvOs"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:text="🖥 Linux"
+                android:textColor="#F5A623"
+                android:textSize="11sp"
                 android:visibility="gone" />
 
             <TextView

@@ -1,8 +1,11 @@
 # Built application files
-*.apk
 *.aar
 *.ap_
 *.aab
+
+# APK files (except signed releases)
+app/build/
+!NetMapper-*.apk
 
 # Files for the ART/Dalvik VM
 *.dex
