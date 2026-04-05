@@ -39,6 +39,10 @@ NetMapper est une application Android native de scan réseau qui permet de déco
 - **Wake-on-LAN** : Réveil d'appareils via magic packet
 - **Traceroute** : Affichage du chemin réseau
 - **Ping** : Test de connectivité avec statistiques
+- **mDNS/Bonjour** : Découverte de services (Apple, Chromecast, Spotify, etc.)
+- **UPnP/SSDP** : Détection d'appareils UPnP (box, TV, NAS, etc.)
+- **SNMP** : Interrogation des équipements réseau (routeurs, switches)
+- **Notes** : Ajout de notes personnalisées sur les appareils
 - **Export** : JSON et CSV
 - **Historique** : Base SQLite des scans
 
@@ -56,9 +60,12 @@ graph TD
     G --> I[Banner Grab]
     G --> J[SSL Check]
     B --> K[ARP Enrichment]
-    F --> L[Wake-on-LAN]
-    F --> M[Traceroute]
-    F --> N[Ping]
+    B --> L[MdnsDiscovery]
+    B --> M[UpnpDiscovery]
+    B --> N[SnmpDiscovery]
+    F --> O[Wake-on-LAN]
+    F --> P[Traceroute]
+    F --> Q[Ping]
 ```
 
 ### Interface
@@ -80,14 +87,17 @@ graph LR
 
 ### Outils réseau
 
-| Outil       | Description                        |
-| ----------- | ---------------------------------- |
-| MAC Lookup  | Recherche fabricant par OUI        |
-| Ping        | Test connectivité (4 paquets)      |
-| Traceroute  | Chemin réseau (max 15 hops)        |
-| Wake-on-LAN | Réveil via magic packet UDP:9      |
-| Export JSON | Export complet au format JSON      |
-| Export CSV  | Export tableur au format CSV       |
+| Outil       | Description                           |
+| ----------- | ------------------------------------- |
+| MAC Lookup  | Recherche fabricant par OUI           |
+| Ping        | Test connectivité (4 paquets)         |
+| Traceroute  | Chemin réseau (max 15 hops)           |
+| Wake-on-LAN | Réveil via magic packet UDP:9         |
+| mDNS Scan   | Découverte services Bonjour (port 5353)|
+| UPnP Scan   | Découverte SSDP (port 1900)           |
+| SNMP Scan   | Requêtes SNMP v1 (port 161)           |
+| Export JSON | Export complet au format JSON         |
+| Export CSV  | Export tableur au format CSV          |
 
 ### Permissions requises
 
@@ -101,7 +111,7 @@ graph LR
 
 ### Installation
 
-1. Télécharger `NetMapper-v1.1-signed.apk`
+1. Télécharger `NetMapper-v1.2-signed.apk`
 2. Activer "Sources inconnues" dans les paramètres
 3. Installer l'application
 
@@ -148,6 +158,10 @@ NetMapper is a native Android network scanner app that discovers devices connect
 - **Wake-on-LAN**: Device wake via magic packet
 - **Traceroute**: Network path display
 - **Ping**: Connectivity test with statistics
+- **mDNS/Bonjour**: Service discovery (Apple, Chromecast, Spotify, etc.)
+- **UPnP/SSDP**: UPnP device detection (routers, TVs, NAS, etc.)
+- **SNMP**: Network equipment interrogation (routers, switches)
+- **Notes**: Add custom notes on devices
 - **Export**: JSON and CSV
 - **History**: SQLite scan database
 
@@ -165,9 +179,12 @@ graph TD
     G --> I[Banner Grab]
     G --> J[SSL Check]
     B --> K[ARP Enrichment]
-    F --> L[Wake-on-LAN]
-    F --> M[Traceroute]
-    F --> N[Ping]
+    B --> L[MdnsDiscovery]
+    B --> M[UpnpDiscovery]
+    B --> N[SnmpDiscovery]
+    F --> O[Wake-on-LAN]
+    F --> P[Traceroute]
+    F --> Q[Ping]
 ```
 
 ### Interface
@@ -189,14 +206,17 @@ graph LR
 
 ### Network Tools
 
-| Tool        | Description                     |
-| ----------- | ------------------------------- |
-| MAC Lookup  | Vendor lookup by OUI            |
-| Ping        | Connectivity test (4 packets)   |
-| Traceroute  | Network path (max 15 hops)      |
-| Wake-on-LAN | Wake via magic packet UDP:9     |
-| Export JSON | Full export in JSON format      |
-| Export CSV  | Spreadsheet export in CSV       |
+| Tool        | Description                           |
+| ----------- | ------------------------------------- |
+| MAC Lookup  | Vendor lookup by OUI                  |
+| Ping        | Connectivity test (4 packets)         |
+| Traceroute  | Network path (max 15 hops)            |
+| Wake-on-LAN | Wake via magic packet UDP:9           |
+| mDNS Scan   | Bonjour service discovery (port 5353) |
+| UPnP Scan   | SSDP discovery (port 1900)            |
+| SNMP Scan   | SNMP v1 queries (port 161)            |
+| Export JSON | Full export in JSON format            |
+| Export CSV  | Spreadsheet export in CSV             |
 
 ### Required Permissions
 

@@ -301,6 +301,9 @@ public class MainActivity extends AppCompatActivity {
         public boolean saved;
         public long firstSeen;
         public String osGuess;                // OS fingerprint guess
+        public List<String> mdnsServices;     // mDNS/Bonjour discovered services
+        public String upnpInfo;               // UPnP device info
+        public String snmpInfo;               // SNMP system info
 
         public Device(String ip) {
             this.ip = ip;
@@ -316,6 +319,9 @@ public class MainActivity extends AppCompatActivity {
             this.saved = false;
             this.firstSeen = System.currentTimeMillis();
             this.osGuess = "";
+            this.mdnsServices = new ArrayList<>();
+            this.upnpInfo = "";
+            this.snmpInfo = "";
         }
     }
 
@@ -389,7 +395,7 @@ public class MainActivity extends AppCompatActivity {
         private final AtomicInteger completed = new AtomicInteger(0);
         private long startTime;
 
-        public void scan(String subnet, int profile, boolean grabBanners, ScanListener listener) {
+        public void scan(String subnet, int profile, boolean grabBanners, boolean doDiscovery, ScanListener listener) {
             if (running) return;
             running = true;
             devices.clear();
@@ -409,6 +415,7 @@ public class MainActivity extends AppCompatActivity {
                 final String ip = subnet + "." + i;
                 final int[] scanPorts = ports;
                 final boolean doBanners = grabBanners;
+                final boolean runDiscovery = doDiscovery;
 
                 pool.submit(() -> {
                     if (!running) return;
@@ -470,6 +477,24 @@ public class MainActivity extends AppCompatActivity {
 
                             // OS Fingerprinting guess
                             device.osGuess = guessOS(device);
+
+                            // Discovery protocols (if enabled)
+                            if (runDiscovery) {
+                                // mDNS/Bonjour discovery
+                                try {
+                                    device.mdnsServices = MdnsDiscovery.discoverServices(ip, 500);
+                                } catch (Exception ignored) {}
+
+                                // UPnP discovery
+                                try {
+                                    device.upnpInfo = UpnpDiscovery.discoverDevice(ip, 500);
+                                } catch (Exception ignored) {}
+
+                                // SNMP discovery
+                                try {
+                                    device.snmpInfo = SnmpDiscovery.queryDevice(ip, 300);
+                                } catch (Exception ignored) {}
+                            }
 
                             devices.add(device);
                             handler.post(() -> {
@@ -805,6 +830,525 @@ public class MainActivity extends AppCompatActivity {
     }
 
     // ============================================================
+    // mDNS/Bonjour Discovery
+    // ============================================================
+    public static class MdnsDiscovery {
+        private static final String MDNS_ADDR = "224.0.0.251";
+        private static final int MDNS_PORT = 5353;
+
+        // Common mDNS service types
+        private static final String[] SERVICE_TYPES = {
+            "_http._tcp.local",
+            "_https._tcp.local",
+            "_ssh._tcp.local",
+            "_sftp-ssh._tcp.local",
+            "_smb._tcp.local",
+            "_afpovertcp._tcp.local",
+            "_nfs._tcp.local",
+            "_ftp._tcp.local",
+            "_ipp._tcp.local",
+            "_printer._tcp.local",
+            "_airplay._tcp.local",
+            "_raop._tcp.local",
+            "_googlecast._tcp.local",
+            "_spotify-connect._tcp.local",
+            "_homekit._tcp.local",
+            "_hap._tcp.local",
+            "_workstation._tcp.local",
+            "_device-info._tcp.local"
+        };
+
+        public static List<String> discoverServices(String targetIp, int timeoutMs) {
+            List<String> services = new ArrayList<>();
+
+            for (String serviceType : SERVICE_TYPES) {
+                try {
+                    byte[] query = buildMdnsQuery(serviceType);
+                    DatagramSocket socket = new DatagramSocket();
+                    socket.setSoTimeout(timeoutMs / SERVICE_TYPES.length);
+                    socket.setBroadcast(true);
+
+                    InetAddress mdnsAddr = InetAddress.getByName(MDNS_ADDR);
+                    DatagramPacket sendPacket = new DatagramPacket(query, query.length, mdnsAddr, MDNS_PORT);
+                    socket.send(sendPacket);
+
+                    byte[] buffer = new byte[1500];
+                    DatagramPacket receivePacket = new DatagramPacket(buffer, buffer.length);
+
+                    try {
+                        socket.receive(receivePacket);
+                        String responderIp = receivePacket.getAddress().getHostAddress();
+
+                        // Check if response is from the target IP
+                        if (responderIp.equals(targetIp)) {
+                            String serviceName = extractServiceName(serviceType);
+                            if (!services.contains(serviceName)) {
+                                services.add(serviceName);
+                            }
+                        }
+                    } catch (Exception ignored) {
+                        // Timeout or no response
+                    }
+
+                    socket.close();
+                } catch (Exception ignored) {}
+            }
+
+            return services;
+        }
+
+        public static Map<String, List<String>> discoverAllServices(int timeoutMs) {
+            Map<String, List<String>> results = new HashMap<>();
+
+            for (String serviceType : SERVICE_TYPES) {
+                try {
+                    byte[] query = buildMdnsQuery(serviceType);
+                    DatagramSocket socket = new DatagramSocket();
+                    socket.setSoTimeout(200);
+                    socket.setBroadcast(true);
+
+                    InetAddress mdnsAddr = InetAddress.getByName(MDNS_ADDR);
+                    DatagramPacket sendPacket = new DatagramPacket(query, query.length, mdnsAddr, MDNS_PORT);
+                    socket.send(sendPacket);
+
+                    byte[] buffer = new byte[1500];
+                    long endTime = System.currentTimeMillis() + 500;
+
+                    while (System.currentTimeMillis() < endTime) {
+                        try {
+                            DatagramPacket receivePacket = new DatagramPacket(buffer, buffer.length);
+                            socket.receive(receivePacket);
+                            String responderIp = receivePacket.getAddress().getHostAddress();
+                            String serviceName = extractServiceName(serviceType);
+
+                            if (!results.containsKey(responderIp)) {
+                                results.put(responderIp, new ArrayList<>());
+                            }
+                            if (!results.get(responderIp).contains(serviceName)) {
+                                results.get(responderIp).add(serviceName);
+                            }
+                        } catch (Exception e) {
+                            break;
+                        }
+                    }
+
+                    socket.close();
+                } catch (Exception ignored) {}
+            }
+
+            return results;
+        }
+
+        private static byte[] buildMdnsQuery(String name) {
+            // Simple DNS query packet
+            byte[] query = new byte[512];
+            int pos = 0;
+
+            // Transaction ID (random)
+            query[pos++] = 0x00;
+            query[pos++] = 0x00;
+
+            // Flags: standard query
+            query[pos++] = 0x00;
+            query[pos++] = 0x00;
+
+            // Questions: 1
+            query[pos++] = 0x00;
+            query[pos++] = 0x01;
+
+            // Answer RRs: 0
+            query[pos++] = 0x00;
+            query[pos++] = 0x00;
+
+            // Authority RRs: 0
+            query[pos++] = 0x00;
+            query[pos++] = 0x00;
+
+            // Additional RRs: 0
+            query[pos++] = 0x00;
+            query[pos++] = 0x00;
+
+            // QNAME (domain name)
+            String[] labels = name.split("\\.");
+            for (String label : labels) {
+                query[pos++] = (byte) label.length();
+                for (char c : label.toCharArray()) {
+                    query[pos++] = (byte) c;
+                }
+            }
+            query[pos++] = 0x00; // End of name
+
+            // QTYPE: PTR (12)
+            query[pos++] = 0x00;
+            query[pos++] = 0x0C;
+
+            // QCLASS: IN (1) with cache flush bit
+            query[pos++] = 0x00;
+            query[pos++] = 0x01;
+
+            byte[] result = new byte[pos];
+            System.arraycopy(query, 0, result, 0, pos);
+            return result;
+        }
+
+        private static String extractServiceName(String serviceType) {
+            // Convert _http._tcp.local to HTTP
+            if (serviceType.startsWith("_") && serviceType.contains("._")) {
+                String name = serviceType.substring(1, serviceType.indexOf("._"));
+                return name.toUpperCase().replace("-", " ");
+            }
+            return serviceType;
+        }
+    }
+
+    // ============================================================
+    // UPnP Discovery (SSDP)
+    // ============================================================
+    public static class UpnpDiscovery {
+        private static final String SSDP_ADDR = "239.255.255.250";
+        private static final int SSDP_PORT = 1900;
+
+        private static final String SSDP_MSEARCH =
+            "M-SEARCH * HTTP/1.1\r\n" +
+            "HOST: 239.255.255.250:1900\r\n" +
+            "MAN: \"ssdp:discover\"\r\n" +
+            "MX: 2\r\n" +
+            "ST: ssdp:all\r\n" +
+            "\r\n";
+
+        public static String discoverDevice(String targetIp, int timeoutMs) {
+            try {
+                DatagramSocket socket = new DatagramSocket();
+                socket.setSoTimeout(timeoutMs);
+                socket.setBroadcast(true);
+
+                InetAddress ssdpAddr = InetAddress.getByName(SSDP_ADDR);
+                byte[] queryBytes = SSDP_MSEARCH.getBytes();
+                DatagramPacket sendPacket = new DatagramPacket(queryBytes, queryBytes.length, ssdpAddr, SSDP_PORT);
+                socket.send(sendPacket);
+
+                byte[] buffer = new byte[2048];
+                StringBuilder deviceInfo = new StringBuilder();
+                long endTime = System.currentTimeMillis() + timeoutMs;
+
+                while (System.currentTimeMillis() < endTime) {
+                    try {
+                        DatagramPacket receivePacket = new DatagramPacket(buffer, buffer.length);
+                        socket.receive(receivePacket);
+                        String responderIp = receivePacket.getAddress().getHostAddress();
+
+                        if (responderIp.equals(targetIp)) {
+                            String response = new String(receivePacket.getData(), 0, receivePacket.getLength());
+                            String info = parseUpnpResponse(response);
+                            if (!info.isEmpty() && !deviceInfo.toString().contains(info)) {
+                                if (deviceInfo.length() > 0) deviceInfo.append("\n");
+                                deviceInfo.append(info);
+                            }
+                        }
+                    } catch (Exception e) {
+                        break;
+                    }
+                }
+
+                socket.close();
+                return deviceInfo.toString();
+            } catch (Exception e) {
+                return "";
+            }
+        }
+
+        public static Map<String, String> discoverAllDevices(int timeoutMs) {
+            Map<String, String> results = new HashMap<>();
+
+            try {
+                DatagramSocket socket = new DatagramSocket();
+                socket.setSoTimeout(500);
+                socket.setBroadcast(true);
+
+                InetAddress ssdpAddr = InetAddress.getByName(SSDP_ADDR);
+                byte[] queryBytes = SSDP_MSEARCH.getBytes();
+                DatagramPacket sendPacket = new DatagramPacket(queryBytes, queryBytes.length, ssdpAddr, SSDP_PORT);
+                socket.send(sendPacket);
+
+                byte[] buffer = new byte[2048];
+                long endTime = System.currentTimeMillis() + timeoutMs;
+
+                while (System.currentTimeMillis() < endTime) {
+                    try {
+                        DatagramPacket receivePacket = new DatagramPacket(buffer, buffer.length);
+                        socket.receive(receivePacket);
+                        String responderIp = receivePacket.getAddress().getHostAddress();
+                        String response = new String(receivePacket.getData(), 0, receivePacket.getLength());
+                        String info = parseUpnpResponse(response);
+
+                        if (!info.isEmpty()) {
+                            if (results.containsKey(responderIp)) {
+                                String existing = results.get(responderIp);
+                                if (!existing.contains(info)) {
+                                    results.put(responderIp, existing + "\n" + info);
+                                }
+                            } else {
+                                results.put(responderIp, info);
+                            }
+                        }
+                    } catch (Exception e) {
+                        break;
+                    }
+                }
+
+                socket.close();
+            } catch (Exception ignored) {}
+
+            return results;
+        }
+
+        private static String parseUpnpResponse(String response) {
+            StringBuilder info = new StringBuilder();
+
+            // Extract SERVER header
+            String server = extractHeader(response, "SERVER");
+            if (server != null && !server.isEmpty()) {
+                info.append(server);
+            }
+
+            // Extract ST (service type)
+            String st = extractHeader(response, "ST");
+            if (st != null && !st.isEmpty()) {
+                String deviceType = parseDeviceType(st);
+                if (!deviceType.isEmpty()) {
+                    if (info.length() > 0) info.append(" | ");
+                    info.append(deviceType);
+                }
+            }
+
+            // Extract USN
+            String usn = extractHeader(response, "USN");
+            if (usn != null && usn.contains("uuid:")) {
+                int start = usn.indexOf("uuid:") + 5;
+                int end = usn.indexOf("::", start);
+                if (end == -1) end = usn.length();
+                String uuid = usn.substring(start, Math.min(end, start + 8));
+                if (info.length() > 0) info.append(" ");
+                info.append("[").append(uuid).append("]");
+            }
+
+            return info.toString();
+        }
+
+        private static String extractHeader(String response, String header) {
+            String[] lines = response.split("\r\n");
+            for (String line : lines) {
+                if (line.toUpperCase().startsWith(header.toUpperCase() + ":")) {
+                    return line.substring(header.length() + 1).trim();
+                }
+            }
+            return null;
+        }
+
+        private static String parseDeviceType(String st) {
+            if (st.contains("MediaRenderer")) return "Media Renderer";
+            if (st.contains("MediaServer")) return "Media Server";
+            if (st.contains("InternetGatewayDevice")) return "Gateway";
+            if (st.contains("WANDevice")) return "WAN Device";
+            if (st.contains("WANConnection")) return "WAN Connection";
+            if (st.contains("Basic")) return "Basic Device";
+            if (st.contains("rootdevice")) return "Root Device";
+            return "";
+        }
+    }
+
+    // ============================================================
+    // SNMP Discovery
+    // ============================================================
+    public static class SnmpDiscovery {
+        private static final int SNMP_PORT = 161;
+        private static final String[] COMMUNITIES = {"public", "private"};
+
+        // Common SNMP OIDs
+        private static final byte[] OID_SYS_DESCR = {0x2B, 0x06, 0x01, 0x02, 0x01, 0x01, 0x01, 0x00}; // 1.3.6.1.2.1.1.1.0
+        private static final byte[] OID_SYS_NAME = {0x2B, 0x06, 0x01, 0x02, 0x01, 0x01, 0x05, 0x00};  // 1.3.6.1.2.1.1.5.0
+
+        public static String queryDevice(String ip, int timeoutMs) {
+            StringBuilder result = new StringBuilder();
+
+            for (String community : COMMUNITIES) {
+                try {
+                    // Query sysName
+                    String sysName = snmpGet(ip, community, OID_SYS_NAME, timeoutMs);
+                    if (sysName != null && !sysName.isEmpty()) {
+                        result.append("Name: ").append(sysName);
+
+                        // Query sysDescr
+                        String sysDescr = snmpGet(ip, community, OID_SYS_DESCR, timeoutMs);
+                        if (sysDescr != null && !sysDescr.isEmpty()) {
+                            result.append("\nDescr: ").append(sysDescr);
+                        }
+
+                        result.append("\nCommunity: ").append(community);
+                        return result.toString();
+                    }
+                } catch (Exception ignored) {}
+            }
+
+            return "";
+        }
+
+        public static Map<String, String> scanNetwork(String subnet, int timeoutMs) {
+            Map<String, String> results = new HashMap<>();
+            ExecutorService pool = Executors.newFixedThreadPool(32);
+
+            for (int i = 1; i <= 254; i++) {
+                final String ip = subnet + "." + i;
+                pool.submit(() -> {
+                    String info = queryDevice(ip, timeoutMs);
+                    if (!info.isEmpty()) {
+                        synchronized (results) {
+                            results.put(ip, info);
+                        }
+                    }
+                });
+            }
+
+            pool.shutdown();
+            try {
+                pool.awaitTermination(30, TimeUnit.SECONDS);
+            } catch (InterruptedException ignored) {}
+
+            return results;
+        }
+
+        private static String snmpGet(String ip, String community, byte[] oid, int timeoutMs) {
+            try {
+                byte[] packet = buildSnmpGetRequest(community, oid);
+
+                DatagramSocket socket = new DatagramSocket();
+                socket.setSoTimeout(timeoutMs);
+
+                InetAddress address = InetAddress.getByName(ip);
+                DatagramPacket sendPacket = new DatagramPacket(packet, packet.length, address, SNMP_PORT);
+                socket.send(sendPacket);
+
+                byte[] buffer = new byte[1500];
+                DatagramPacket receivePacket = new DatagramPacket(buffer, buffer.length);
+                socket.receive(receivePacket);
+
+                socket.close();
+
+                return parseSnmpResponse(receivePacket.getData(), receivePacket.getLength());
+            } catch (Exception e) {
+                return null;
+            }
+        }
+
+        private static byte[] buildSnmpGetRequest(String community, byte[] oid) {
+            // Build SNMP v1 GET request
+            byte[] communityBytes = community.getBytes();
+
+            // Variable bindings (just the OID with null value)
+            int varbindLen = oid.length + 4; // OID + null type + null length
+            int varbindListLen = varbindLen + 2;
+
+            // PDU
+            int pduLen = varbindListLen + 2 + 12; // varbind list + sequence header + request-id + error stuff
+
+            // Message
+            int messageLen = pduLen + 2 + communityBytes.length + 2 + 3; // pdu + header + community + header + version
+
+            byte[] packet = new byte[messageLen + 2];
+            int pos = 0;
+
+            // SEQUENCE (message)
+            packet[pos++] = 0x30;
+            packet[pos++] = (byte) messageLen;
+
+            // Version (SNMPv1 = 0)
+            packet[pos++] = 0x02; // INTEGER
+            packet[pos++] = 0x01; // length
+            packet[pos++] = 0x00; // value
+
+            // Community string
+            packet[pos++] = 0x04; // OCTET STRING
+            packet[pos++] = (byte) communityBytes.length;
+            System.arraycopy(communityBytes, 0, packet, pos, communityBytes.length);
+            pos += communityBytes.length;
+
+            // GetRequest PDU
+            packet[pos++] = (byte) 0xA0; // GET-REQUEST
+            packet[pos++] = (byte) pduLen;
+
+            // Request ID
+            packet[pos++] = 0x02; // INTEGER
+            packet[pos++] = 0x04; // length
+            packet[pos++] = 0x00;
+            packet[pos++] = 0x00;
+            packet[pos++] = 0x00;
+            packet[pos++] = 0x01;
+
+            // Error status
+            packet[pos++] = 0x02;
+            packet[pos++] = 0x01;
+            packet[pos++] = 0x00;
+
+            // Error index
+            packet[pos++] = 0x02;
+            packet[pos++] = 0x01;
+            packet[pos++] = 0x00;
+
+            // Variable bindings SEQUENCE
+            packet[pos++] = 0x30;
+            packet[pos++] = (byte) varbindListLen;
+
+            // VarBind SEQUENCE
+            packet[pos++] = 0x30;
+            packet[pos++] = (byte) varbindLen;
+
+            // OID
+            packet[pos++] = 0x06; // OBJECT IDENTIFIER
+            packet[pos++] = (byte) oid.length;
+            System.arraycopy(oid, 0, packet, pos, oid.length);
+            pos += oid.length;
+
+            // NULL value
+            packet[pos++] = 0x05;
+            packet[pos++] = 0x00;
+
+            byte[] result = new byte[pos];
+            System.arraycopy(packet, 0, result, 0, pos);
+            return result;
+        }
+
+        private static String parseSnmpResponse(byte[] data, int length) {
+            try {
+                // Simple parser - look for OCTET STRING values
+                for (int i = 0; i < length - 2; i++) {
+                    if (data[i] == 0x04) { // OCTET STRING
+                        int strLen = data[i + 1] & 0xFF;
+                        if (strLen > 0 && strLen < 200 && i + 2 + strLen <= length) {
+                            String value = new String(data, i + 2, strLen);
+                            // Filter out non-printable strings
+                            if (isPrintable(value) && value.length() > 1) {
+                                return value.trim();
+                            }
+                        }
+                    }
+                }
+            } catch (Exception ignored) {}
+            return null;
+        }
+
+        private static boolean isPrintable(String s) {
+            for (char c : s.toCharArray()) {
+                if (c < 32 || c > 126) {
+                    if (c != '\n' && c != '\r' && c != '\t') {
+                        return false;
+                    }
+                }
+            }
+            return true;
+        }
+    }
+
+    // ============================================================
     // Device Adapter (Enhanced)
     // ============================================================
     public class DeviceAdapter extends RecyclerView.Adapter<DeviceAdapter.ViewHolder> {
@@ -1007,7 +1551,9 @@ public class MainActivity extends AppCompatActivity {
     // Views - Settings
     private EditText etMacLookup, etWolMac, etPingHost, etTracerouteHost;
     private Button btnMacLookup, btnWol, btnPing, btnTraceroute, btnExportJson, btnExportCsv;
-    private TextView tvMacResult, tvStats, tvToolsResult;
+    private Button btnMdnsScan, btnUpnpScan, btnSnmpScan;
+    private TextView tvMacResult, tvStats, tvToolsResult, tvDiscoveryResult;
+    private android.widget.CheckBox cbDiscovery;
 
     // State
     private Scanner scanner;
@@ -1158,6 +1704,113 @@ public class MainActivity extends AppCompatActivity {
         if (btnExportCsv != null) {
             btnExportCsv.setOnClickListener(v -> exportToCsv());
         }
+
+        // Discovery checkbox
+        cbDiscovery = findViewById(R.id.cbDiscovery);
+
+        // Discovery tools
+        btnMdnsScan = findViewById(R.id.btnMdnsScan);
+        btnUpnpScan = findViewById(R.id.btnUpnpScan);
+        btnSnmpScan = findViewById(R.id.btnSnmpScan);
+        tvDiscoveryResult = findViewById(R.id.tvDiscoveryResult);
+
+        if (btnMdnsScan != null) {
+            btnMdnsScan.setOnClickListener(v -> runMdnsScan());
+        }
+
+        if (btnUpnpScan != null) {
+            btnUpnpScan.setOnClickListener(v -> runUpnpScan());
+        }
+
+        if (btnSnmpScan != null) {
+            btnSnmpScan.setOnClickListener(v -> runSnmpScan());
+        }
+    }
+
+    private void runMdnsScan() {
+        if (tvDiscoveryResult != null) {
+            tvDiscoveryResult.setText("Scan mDNS/Bonjour en cours...");
+        }
+        new Thread(() -> {
+            Map<String, List<String>> results = MdnsDiscovery.discoverAllServices(3000);
+            StringBuilder sb = new StringBuilder();
+            sb.append("=== mDNS/Bonjour Discovery ===\n\n");
+            if (results.isEmpty()) {
+                sb.append("Aucun service mDNS trouvé");
+            } else {
+                for (Map.Entry<String, List<String>> entry : results.entrySet()) {
+                    sb.append(entry.getKey()).append(":\n");
+                    for (String svc : entry.getValue()) {
+                        sb.append("  • ").append(svc).append("\n");
+                    }
+                    sb.append("\n");
+                }
+                sb.append("Total: ").append(results.size()).append(" hôtes");
+            }
+            runOnUiThread(() -> {
+                if (tvDiscoveryResult != null) {
+                    tvDiscoveryResult.setText(sb.toString());
+                }
+            });
+        }).start();
+    }
+
+    private void runUpnpScan() {
+        if (tvDiscoveryResult != null) {
+            tvDiscoveryResult.setText("Scan UPnP/SSDP en cours...");
+        }
+        new Thread(() -> {
+            Map<String, String> results = UpnpDiscovery.discoverAllDevices(3000);
+            StringBuilder sb = new StringBuilder();
+            sb.append("=== UPnP/SSDP Discovery ===\n\n");
+            if (results.isEmpty()) {
+                sb.append("Aucun appareil UPnP trouvé");
+            } else {
+                for (Map.Entry<String, String> entry : results.entrySet()) {
+                    sb.append(entry.getKey()).append(":\n");
+                    sb.append("  ").append(entry.getValue().replace("\n", "\n  ")).append("\n\n");
+                }
+                sb.append("Total: ").append(results.size()).append(" appareils");
+            }
+            runOnUiThread(() -> {
+                if (tvDiscoveryResult != null) {
+                    tvDiscoveryResult.setText(sb.toString());
+                }
+            });
+        }).start();
+    }
+
+    private void runSnmpScan() {
+        String subnet = etSubnet.getText().toString().trim();
+        if (subnet.isEmpty()) {
+            if (tvDiscoveryResult != null) {
+                tvDiscoveryResult.setText("Erreur: entrez d'abord la plage réseau");
+            }
+            return;
+        }
+        if (tvDiscoveryResult != null) {
+            tvDiscoveryResult.setText("Scan SNMP en cours sur " + subnet + ".1-254...\n(peut prendre 30s)");
+        }
+        new Thread(() -> {
+            Map<String, String> results = SnmpDiscovery.scanNetwork(subnet, 500);
+            StringBuilder sb = new StringBuilder();
+            sb.append("=== SNMP Discovery ===\n\n");
+            if (results.isEmpty()) {
+                sb.append("Aucun appareil SNMP trouvé\n");
+                sb.append("(assurez-vous que SNMP est activé avec community 'public')");
+            } else {
+                for (Map.Entry<String, String> entry : results.entrySet()) {
+                    sb.append(entry.getKey()).append(":\n");
+                    sb.append("  ").append(entry.getValue().replace("\n", "\n  ")).append("\n\n");
+                }
+                sb.append("Total: ").append(results.size()).append(" appareils SNMP");
+            }
+            runOnUiThread(() -> {
+                if (tvDiscoveryResult != null) {
+                    tvDiscoveryResult.setText(sb.toString());
+                }
+            });
+        }).start();
     }
 
     private void showDeviceDetails(Device d) {
@@ -1174,6 +1827,33 @@ public class MainActivity extends AppCompatActivity {
         if (d.latencyMs > 0) {
             details.append("Latency: ").append(d.latencyMs).append("ms\n");
         }
+
+        // mDNS services
+        if (!d.mdnsServices.isEmpty()) {
+            details.append("\n--- Services mDNS ---\n");
+            for (String svc : d.mdnsServices) {
+                details.append("• ").append(svc).append("\n");
+            }
+        }
+
+        // UPnP info
+        if (!d.upnpInfo.isEmpty()) {
+            details.append("\n--- UPnP ---\n");
+            details.append(d.upnpInfo).append("\n");
+        }
+
+        // SNMP info
+        if (!d.snmpInfo.isEmpty()) {
+            details.append("\n--- SNMP ---\n");
+            details.append(d.snmpInfo).append("\n");
+        }
+
+        // Notes
+        if (!d.notes.isEmpty()) {
+            details.append("\n--- Notes ---\n");
+            details.append(d.notes).append("\n");
+        }
+
         details.append("\n--- Ports ouverts ---\n");
         for (int port : d.openPorts) {
             String svc = d.services.get(port);
@@ -1194,6 +1874,7 @@ public class MainActivity extends AppCompatActivity {
                 .setTitle("📱 " + d.ip)
                 .setMessage(details.toString())
                 .setPositiveButton("Fermer", null)
+                .setNegativeButton("📝 Notes", (dialog, which) -> showNotesEditor(d))
                 .setNeutralButton("Wake-on-LAN", (dialog, which) -> {
                     if (!d.mac.isEmpty()) {
                         String broadcast = gateway.substring(0, gateway.lastIndexOf('.')) + ".255";
@@ -1203,6 +1884,34 @@ public class MainActivity extends AppCompatActivity {
                         Toast.makeText(this, "MAC inconnue", Toast.LENGTH_SHORT).show();
                     }
                 })
+                .show();
+    }
+
+    private void showNotesEditor(Device d) {
+        EditText editNotes = new EditText(this);
+        editNotes.setText(d.notes);
+        editNotes.setHint("Entrez vos notes...");
+        editNotes.setMinLines(3);
+        editNotes.setBackgroundColor(0xFF1A2A3A);
+        editNotes.setTextColor(0xFFFFFFFF);
+        editNotes.setHintTextColor(0xFF666666);
+        editNotes.setPadding(dpToPx(12), dpToPx(12), dpToPx(12), dpToPx(12));
+
+        LinearLayout container = new LinearLayout(this);
+        container.setPadding(dpToPx(24), dpToPx(16), dpToPx(24), dpToPx(8));
+        container.addView(editNotes, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT));
+
+        new AlertDialog.Builder(this, R.style.Theme_NetMapper_Dialog)
+                .setTitle("📝 Notes pour " + d.ip)
+                .setView(container)
+                .setPositiveButton("Enregistrer", (dialog, which) -> {
+                    d.notes = editNotes.getText().toString().trim();
+                    adapter.notifyDataSetChanged();
+                    Toast.makeText(this, "Notes enregistrées", Toast.LENGTH_SHORT).show();
+                })
+                .setNegativeButton("Annuler", null)
                 .show();
     }
 
@@ -1478,13 +2187,19 @@ public class MainActivity extends AppCompatActivity {
             log("Banner grabbing activé");
         }
 
+        boolean doDiscovery = cbDiscovery != null && cbDiscovery.isChecked();
+        if (doDiscovery) {
+            log("Discovery activé (mDNS, UPnP, SNMP)");
+        }
+
         log("Scan de " + subnet + ".1-254...");
         btnScan.setText("⏹ Arrêter");
         progressBar.setVisibility(View.VISIBLE);
         progressBar.setProgress(0);
 
         final String finalProfileName = profileName;
-        scanner.scan(subnet, profile, grabBanners, new ScanListener() {
+        final boolean finalDoDiscovery = doDiscovery;
+        scanner.scan(subnet, profile, grabBanners, finalDoDiscovery, new ScanListener() {
             @Override
             public void onHost(Device device) {
                 adapter.add(device);

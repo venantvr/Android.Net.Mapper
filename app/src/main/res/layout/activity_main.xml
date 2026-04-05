@@ -167,6 +167,16 @@
                     android:buttonTint="#0A84FF"
                     android:checked="true" />
 
+                <CheckBox
+                    android:id="@+id/cbDiscovery"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:text="Discovery (mDNS, UPnP, SNMP)"
+                    android:textColor="#AAAAAA"
+                    android:buttonTint="#0A84FF"
+                    android:checked="true" />
+
                 <Button
                     android:id="@+id/btnScan"
                     android:layout_width="match_parent"
@@ -473,6 +483,85 @@
 
                 <TextView
                     android:id="@+id/tvToolsResult"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:background="@drawable/log_bg"
+                    android:fontFamily="monospace"
+                    android:padding="12dp"
+                    android:text=""
+                    android:textColor="#4CAF50"
+                    android:textSize="11sp"
+                    android:minHeight="80dp"
+                    android:gravity="top" />
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:layout_marginVertical="20dp"
+                    android:background="#1E2E3E" />
+
+                <!-- Discovery Tools -->
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="🔎 Discovery"
+                    android:textColor="#7CB8FF"
+                    android:textSize="16sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:text="Scan réseau pour services mDNS/Bonjour, UPnP et SNMP"
+                    android:textColor="#666666"
+                    android:textSize="12sp" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:orientation="horizontal">
+
+                    <Button
+                        android:id="@+id/btnMdnsScan"
+                        android:layout_width="0dp"
+                        android:layout_height="44dp"
+                        android:layout_weight="1"
+                        android:backgroundTint="#E91E63"
+                        android:text="mDNS"
+                        android:textColor="#FFFFFF"
+                        android:textAllCaps="false"
+                        android:textSize="12sp" />
+
+                    <Button
+                        android:id="@+id/btnUpnpScan"
+                        android:layout_width="0dp"
+                        android:layout_height="44dp"
+                        android:layout_weight="1"
+                        android:layout_marginStart="8dp"
+                        android:backgroundTint="#9C27B0"
+                        android:text="UPnP"
+                        android:textColor="#FFFFFF"
+                        android:textAllCaps="false"
+                        android:textSize="12sp" />
+
+                    <Button
+                        android:id="@+id/btnSnmpScan"
+                        android:layout_width="0dp"
+                        android:layout_height="44dp"
+                        android:layout_weight="1"
+                        android:layout_marginStart="8dp"
+                        android:backgroundTint="#3F51B5"
+                        android:text="SNMP"
+                        android:textColor="#FFFFFF"
+                        android:textAllCaps="false"
+                        android:textSize="12sp" />
+                </LinearLayout>
+
+                <TextView
+                    android:id="@+id/tvDiscoveryResult"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="12dp"
