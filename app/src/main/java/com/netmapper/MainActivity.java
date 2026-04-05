@@ -1599,27 +1599,33 @@ public class MainActivity extends AppCompatActivity {
         progressBar = findViewById(R.id.progressBar);
         cbBanners = findViewById(R.id.cbBanners);
 
-        btnScan.setOnClickListener(v -> toggleScan());
+        if (btnScan != null) {
+            btnScan.setOnClickListener(v -> toggleScan());
+        }
 
         // Devices
         etFilter = findViewById(R.id.etFilter);
         rvDevices = findViewById(R.id.rvDevices);
         adapter = new DeviceAdapter();
-        rvDevices.setLayoutManager(new LinearLayoutManager(this));
-        rvDevices.setAdapter(adapter);
+        if (rvDevices != null) {
+            rvDevices.setLayoutManager(new LinearLayoutManager(this));
+            rvDevices.setAdapter(adapter);
+        }
 
         adapter.setOnDeviceClickListener(this::showDeviceDetails);
 
-        etFilter.addTextChangedListener(new TextWatcher() {
-            @Override
-            public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
-            @Override
-            public void onTextChanged(CharSequence s, int start, int before, int count) {
-                adapter.setFilter(s.toString());
-            }
-            @Override
-            public void afterTextChanged(Editable s) {}
-        });
+        if (etFilter != null) {
+            etFilter.addTextChangedListener(new TextWatcher() {
+                @Override
+                public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+                @Override
+                public void onTextChanged(CharSequence s, int start, int before, int count) {
+                    adapter.setFilter(s.toString());
+                }
+                @Override
+                public void afterTextChanged(Editable s) {}
+            });
+        }
 
         // Map
         mapContent = findViewById(R.id.mapContent);
@@ -1641,16 +1647,18 @@ public class MainActivity extends AppCompatActivity {
         btnExportJson = findViewById(R.id.btnExportJson);
         btnExportCsv = findViewById(R.id.btnExportCsv);
 
-        btnMacLookup.setOnClickListener(v -> {
-            String mac = etMacLookup.getText().toString().trim();
-            if (mac.length() >= 8) {
-                String prefix = mac.substring(0, 8).toUpperCase();
-                String vendor = oui(mac);
-                tvMacResult.setText("OUI : " + prefix + "\nVendor : " + vendor);
-            } else {
-                tvMacResult.setText("Entrez une adresse MAC valide");
-            }
-        });
+        if (btnMacLookup != null) {
+            btnMacLookup.setOnClickListener(v -> {
+                String mac = etMacLookup.getText().toString().trim();
+                if (mac.length() >= 8) {
+                    String prefix = mac.substring(0, 8).toUpperCase();
+                    String vendor = oui(mac);
+                    tvMacResult.setText("OUI : " + prefix + "\nVendor : " + vendor);
+                } else {
+                    tvMacResult.setText("Entrez une adresse MAC valide");
+                }
+            });
+        }
 
         if (btnWol != null) {
             btnWol.setOnClickListener(v -> {
