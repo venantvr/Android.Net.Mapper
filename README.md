@@ -112,7 +112,7 @@ graph LR
 
 ### Installation
 
-1. Télécharger `NetMapper-v1.2-signed.apk`
+1. Télécharger `NetMapper-v1.2.1-signed.apk`
 2. Activer "Sources inconnues" dans les paramètres
 3. Installer l'application
 
