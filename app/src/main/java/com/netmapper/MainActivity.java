@@ -39,7 +39,7 @@ import androidx.core.content.FileProvider;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
-import com.google.android.material.bottomnavigation.BottomNavigationView;
+import android.widget.ImageView;
 import com.google.android.material.card.MaterialCardView;
 import com.google.android.material.progressindicator.LinearProgressIndicator;
 
@@ -2053,20 +2053,54 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void setupNavigation() {
-        BottomNavigationView nav = findViewById(R.id.bottom_nav);
-        if (nav != null) {
-            nav.setOnItemSelectedListener(item -> {
-                int id = item.getItemId();
-                if (viewScan != null) viewScan.setVisibility(id == R.id.nav_scan ? View.VISIBLE : View.GONE);
-                if (viewDevices != null) viewDevices.setVisibility(id == R.id.nav_devices ? View.VISIBLE : View.GONE);
-                if (viewMap != null) viewMap.setVisibility(id == R.id.nav_map ? View.VISIBLE : View.GONE);
-                if (viewSettings != null) viewSettings.setVisibility(id == R.id.nav_settings ? View.VISIBLE : View.GONE);
+        View navScan = findViewById(R.id.nav_scan);
+        View navDevices = findViewById(R.id.nav_devices);
+        View navMap = findViewById(R.id.nav_map);
+        View navSettings = findViewById(R.id.nav_settings);
 
-                if (id == R.id.nav_settings) {
-                    updateStats();
+        View.OnClickListener navListener = v -> {
+            int id = v.getId();
+            selectNavItem(id);
+        };
+
+        if (navScan != null) navScan.setOnClickListener(navListener);
+        if (navDevices != null) navDevices.setOnClickListener(navListener);
+        if (navMap != null) navMap.setOnClickListener(navListener);
+        if (navSettings != null) navSettings.setOnClickListener(navListener);
+
+        // Select first tab by default
+        selectNavItem(R.id.nav_scan);
+    }
+
+    private void selectNavItem(int id) {
+        // Update views visibility
+        if (viewScan != null) viewScan.setVisibility(id == R.id.nav_scan ? View.VISIBLE : View.GONE);
+        if (viewDevices != null) viewDevices.setVisibility(id == R.id.nav_devices ? View.VISIBLE : View.GONE);
+        if (viewMap != null) viewMap.setVisibility(id == R.id.nav_map ? View.VISIBLE : View.GONE);
+        if (viewSettings != null) viewSettings.setVisibility(id == R.id.nav_settings ? View.VISIBLE : View.GONE);
+
+        // Update nav item colors
+        updateNavColors(id);
+
+        if (id == R.id.nav_settings) {
+            updateStats();
+        }
+    }
+
+    private void updateNavColors(int selectedId) {
+        int[] navIds = {R.id.nav_scan, R.id.nav_devices, R.id.nav_map, R.id.nav_settings};
+        for (int navId : navIds) {
+            View navItem = findViewById(navId);
+            if (navItem != null) {
+                TextView label = (TextView) ((LinearLayout) navItem).getChildAt(1);
+                ImageView icon = (ImageView) ((LinearLayout) navItem).getChildAt(0);
+                if (label != null) {
+                    label.setTextColor(navId == selectedId ? 0xFF0A84FF : 0xFF666666);
                 }
-                return true;
-            });
+                if (icon != null) {
+                    icon.setColorFilter(navId == selectedId ? 0xFF0A84FF : 0xFF666666);
+                }
+            }
         }
     }
 
