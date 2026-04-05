@@ -1569,13 +1569,17 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_main);
-
-        scanner = new Scanner();
-        dbHelper = new ScanDbHelper(this);
-        initViews();
-        setupNavigation();
-        requestPermissions();
+        try {
+            setContentView(R.layout.activity_main);
+            scanner = new Scanner();
+            dbHelper = new ScanDbHelper(this);
+            initViews();
+            setupNavigation();
+            requestPermissions();
+        } catch (Exception e) {
+            Toast.makeText(this, "Erreur: " + e.getMessage(), Toast.LENGTH_LONG).show();
+            e.printStackTrace();
+        }
     }
 
     private void initViews() {
@@ -2050,18 +2054,20 @@ public class MainActivity extends AppCompatActivity {
 
     private void setupNavigation() {
         BottomNavigationView nav = findViewById(R.id.bottom_nav);
-        nav.setOnItemSelectedListener(item -> {
-            int id = item.getItemId();
-            viewScan.setVisibility(id == R.id.nav_scan ? View.VISIBLE : View.GONE);
-            viewDevices.setVisibility(id == R.id.nav_devices ? View.VISIBLE : View.GONE);
-            viewMap.setVisibility(id == R.id.nav_map ? View.VISIBLE : View.GONE);
-            viewSettings.setVisibility(id == R.id.nav_settings ? View.VISIBLE : View.GONE);
+        if (nav != null) {
+            nav.setOnItemSelectedListener(item -> {
+                int id = item.getItemId();
+                if (viewScan != null) viewScan.setVisibility(id == R.id.nav_scan ? View.VISIBLE : View.GONE);
+                if (viewDevices != null) viewDevices.setVisibility(id == R.id.nav_devices ? View.VISIBLE : View.GONE);
+                if (viewMap != null) viewMap.setVisibility(id == R.id.nav_map ? View.VISIBLE : View.GONE);
+                if (viewSettings != null) viewSettings.setVisibility(id == R.id.nav_settings ? View.VISIBLE : View.GONE);
 
-            if (id == R.id.nav_settings) {
-                updateStats();
-            }
-            return true;
-        });
+                if (id == R.id.nav_settings) {
+                    updateStats();
+                }
+                return true;
+            });
+        }
     }
 
     private void requestPermissions() {
